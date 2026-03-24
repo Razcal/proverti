@@ -14,7 +14,7 @@ function DetailModal({ item, onClose, onDeleteLog }) {
     <div className="fixed inset-0 z-50 flex items-end bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white w-full rounded-t-[32px] slide-up h-[92vh] flex flex-col p-6" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-          <div><h3 className="font-black text-3xl">{item.id}</h3><p className="text-xs text-slate-500 uppercase">{item.ras} • {item.phase}</p></div>
+          <div><h3 className="font-black text-3xl">{item.code || item.id}</h3><p className="text-xs text-slate-500 uppercase">{item.ras} • {item.phase}</p></div>
           <button onClick={onClose} className="bg-slate-100 w-10 h-10 rounded-full font-bold">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto mt-4">
@@ -54,7 +54,7 @@ function AssetRecordCard({ item, onEdit, onOpenAction, onOpenDetail, onDelete, h
     <div ref={cardRef} className={`bg-white rounded-3xl border shadow-sm overflow-hidden mb-4 transition-all duration-300 ${isHighlighted ? 'highlight-blink border-emerald-500 ring-2 ring-emerald-500 shadow-emerald-500/20 shadow-lg' : 'border-slate-100'}`} onClick={() => onOpenDetail && onOpenDetail(item)}>
       <div className="p-5 border-b border-slate-50">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-2xl font-black tracking-tight">{item.id || "?"}</h3>
+          <h3 className="text-2xl font-black tracking-tight">{item.code || item.id || "?"}</h3>
           <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded-xl ${c.bg} ${c.text}`}>{analysis.statusLabel}</span>
         </div>
         <p className="text-xs text-slate-500 font-medium">Usia: <span className="font-bold">{getAge(item.birthDate)}</span></p>

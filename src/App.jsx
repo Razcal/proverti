@@ -274,7 +274,7 @@ function AdviceCard({ item, analysis, onClick }) {
         <span className="text-lg">{icon}</span>
       </div>
       <div>
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sapi {item.id}</p>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sapi {item.code || item.id}</p>
         <p className="text-sm font-semibold text-slate-800 leading-snug mt-1">
           {analysis.advice.replace(/⚠️|🚨|💡|✅/g, '').trim()}
         </p>
@@ -294,7 +294,7 @@ function DetailModal({ item, onClose, onDeleteLog }) {
         <div className="flex justify-center pt-3 pb-1"><div className="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div className="flex justify-between items-center p-6 border-b border-slate-100 pb-4">
           <div>
-            <h3 className="font-black text-3xl text-slate-900 tracking-tight">{item.id}</h3>
+            <h3 className="font-black text-3xl text-slate-900 tracking-tight">{item.code || item.id}</h3>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">{item.gender === 'JANTAN' ? 'Jantan' : 'Betina'} • {item.ras} • {item.status_reproduksi || item.phase}</p>
           </div>
           <button onClick={onClose} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200 transition-colors">✕</button>
@@ -464,7 +464,7 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
-          <div><p className="font-black text-xl text-slate-900 tracking-tight">Lapor Aksi Terpadu</p><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">ID: {item.id} • {item.gender}</p></div>
+          <div><p className="font-black text-xl text-slate-900 tracking-tight">Lapor Aksi Terpadu</p><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{item.code || item.id} • {item.gender}</p></div>
           <button onClick={onClose} className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200">✕</button>
         </div>
         <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
