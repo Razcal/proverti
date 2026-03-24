@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { addOrUpdateCattle, deleteCattle, deleteCattleLog, saveReproLog, saveHealthLog } from "./store/cattleSlice";
+import { addOrUpdateCattle, deleteCattle, deleteCattleLog, saveReproLog, saveHealthLog, saveHealthReport } from "./store/cattleSlice";
 import { todayStr, fmtDate, getAge, dialog, handleExportCSV } from "./core/helpers";
 import { COLOR } from "./core/constants";
 import { analyzeCattle, buildHistory } from "./core/cattleEngine";
@@ -109,21 +109,15 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
   const [isUSG, setIsUSG] = useState(false);
   const [pregMonth, setPregMonth] = useState("");
   
+  // Health Report (Peternak - Simplified)
   const [dHealth, setDHealth] = useState(todayStr());
-  const [anamnesa, setAnamnesa] = useState("");
-  const [pemFisik, setPemFisik] = useState("");
-  const [pemPenunjang, setPemPenunjang] = useState("");
-  const [diagBanding, setDiagBanding] = useState("");
-  const [diagnosa, setDiagnosa] = useState("");
-  const [prognosa, setPrognosa] = useState("Fausta");
-  const [pengobatan, setPengobatan] = useState("");
-  const [statusHealth, setStatusHealth] = useState("SAKIT");
+  const [gejalaKeluhan, setGejalaKeluhan] = useState("");
 
   useEffect(() => {
     if(open) { 
       setTab(item?.gender === "JANTAN" ? "KESEHATAN" : "REPRO");
       setResRepro("NONE"); setDRepro(todayStr()); setIsUSG(false); setPregMonth("");
-      setDHealth(todayStr()); setAnamnesa(""); setPemFisik(""); setPemPenunjang(""); setDiagBanding(""); setDiagnosa(""); setPrognosa("Fausta"); setPengobatan(""); setStatusHealth("SAKIT");
+      setDHealth(todayStr()); setGejalaKeluhan("");
     }
   }, [open, item]);
 
@@ -150,8 +144,8 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
   };
 
   const submitHealth = () => {
-    if (!anamnesa.trim()) return dialog.alert("Anamnesa (Keluhan awal / Riwayat) wajib diisi!", "Perhatian");
-    if (onSaveHealth) onSaveHealth(dHealth, anamnesa, pemFisik, pemPenunjang, diagBanding, diagnosa, prognosa, pengobatan, statusHealth);
+    if (!gejalaKeluhan.trim()) return dialog.alert("Harap tuliskan gejala/keluhan yang dialami ternak!", "Perhatian");
+    if (onSaveHealth) onSaveHealth(dHealth, gejalaKeluhan);
     if (onClose) onClose();
   };
 
@@ -170,11 +164,19 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
         </div>
         {tab === "KESEHATAN" && (
           <div className="space-y-4 fade-in">
-            <FF label="Tanggal Periksa / Rekam Medis"><input type="date" className={inp} value={dHealth} onChange={e => setDHealth(e.target.value)} /></FF>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3"><p className="text-[10px] font-extrabold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-2">1. Kajian Awal</p><FF label="Anamnesa (Keluhan & Riwayat)"><textarea className={inp + " h-16 resize-none"} value={anamnesa} onChange={e => setAnamnesa(e.target.value)} placeholder="Contoh: Penurunan nafsu makan sejak 2 hari lalu..." /></FF></div>
-            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3"><p className="text-[10px] font-extrabold text-blue-800 uppercase tracking-widest border-b border-blue-200 pb-2 mb-2">2. Pemeriksaan & Diagnosa Medis</p><div className="flex gap-3"><div className="flex-1"><FF label="Pem. Fisik (Klinis)"><textarea className={inp + " h-16 resize-none text-xs"} value={pemFisik} onChange={e => setPemFisik(e.target.value)} placeholder="Suhu, napas, mukosa, BCS..." /></FF></div><div className="flex-1"><FF label="Pem. Penunjang"><textarea className={inp + " h-16 resize-none text-xs"} value={pemPenunjang} onChange={e => setPemPenunjang(e.target.value)} placeholder="Lab, Darah, Feses..." /></FF></div></div><FF label="Diagnosa Banding (DD)"><input className={inp} value={diagBanding} onChange={e => setDiagBanding(e.target.value)} placeholder="Kemungkinan penyakit lain..." /></FF><FF label="Diagnosa Final"><input className={inp} value={diagnosa} onChange={e => setDiagnosa(e.target.value)} placeholder="Diagnosa utama..." /></FF><div className="flex gap-3"><div className="flex-1"><FF label="Prognosa"><select className={inp} value={prognosa} onChange={e => setPrognosa(e.target.value)}><option value="Fausta">Fausta (Cenderung Sembuh)</option><option value="Dubia">Dubia (Ragu-ragu)</option><option value="Infausta">Infausta (Buruk / Fatal)</option></select></FF></div><div className="flex-1"><FF label="Status Akhir Pasien"><select className={inp} value={statusHealth} onChange={e => setStatusHealth(e.target.value)}><option value="SAKIT">Masih Sakit (Aktif)</option><option value="SEMBUH">Sembuh Total</option></select></FF></div></div></div>
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-3"><p className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-widest border-b border-emerald-200 pb-2 mb-2">3. Tindakan Medis</p><FF label="Pengobatan / Terapi"><textarea className={inp + " h-20 resize-none"} value={pengobatan} onChange={e => setPengobatan(e.target.value)} placeholder="Rincian obat, resep, dosis, dan rute pemberian..." /></FF></div>
-            <button onClick={submitHealth} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl mt-4 text-sm shadow-lg shadow-blue-500/30 transition-all">Simpan Rekam Medis</button>
+            <FF label="Tanggal Laporan Kesehatan"><input type="date" className={inp} value={dHealth} onChange={e => setDHealth(e.target.value)} /></FF>
+            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
+              <p className="text-[10px] font-extrabold text-blue-800 uppercase tracking-widest border-b border-blue-200 pb-2 mb-2">📋 Gejala & Keluhan Ternak</p>
+              <FF label="Deskripsi Gejala / Keluhan">
+                <textarea 
+                  className={inp + " h-24 resize-none"} 
+                  value={gejalaKeluhan} 
+                  onChange={e => setGejalaKeluhan(e.target.value)} 
+                  placeholder="Tuliskan semua gejala dan keluhan yang dialami ternak secara detail. Contoh: Anggota gerak bengkak, demam tinggi, penurunan nafsu makan, dll..." 
+                />
+              </FF>
+            </div>
+            <button onClick={submitHealth} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl mt-4 text-sm shadow-lg shadow-blue-500/30 transition-all">Kirim Laporan Kesehatan</button>
           </div>
         )}
         {tab === "REPRO" && item.gender === "BETINA" && (
@@ -244,18 +246,8 @@ export function AssetsView({ highlightedId, setHighlightedId }) {
           }
           dispatch(saveReproLog({ itemId: actionItem.id, res, d, calculatedConception }));
         }} 
-        onSaveHealth={(d, anamnesa, pemFisik, pemPenunjang, diagBanding, diagnosa, prognosa, pengobatan, status) => {
-          let treatmentText = "";
-          if (pemFisik) treatmentText += `• Fisik: ${pemFisik}\n`;
-          if (pemPenunjang) treatmentText += `• Penunjang: ${pemPenunjang}\n`;
-          if (diagBanding) treatmentText += `• DD: ${diagBanding}\n`;
-          if (diagnosa) treatmentText += `• Diagnosa: ${diagnosa} (Px: ${prognosa})\n`;
-          if (pengobatan) treatmentText += `• Terapi: ${pengobatan}`;
-          if (!treatmentText) treatmentText = "Menunggu pemeriksaan & tindakan medis lebih lanjut";
-          else treatmentText = treatmentText.trim();
-      
-          const logEntry = { date: d, kondisi: anamnesa, treatment: treatmentText, status: status, rawMedis: { anamnesa, pemFisik, pemPenunjang, diagBanding, diagnosa, prognosa, pengobatan } };
-          dispatch(saveHealthLog({ itemId: actionItem.id, logEntry }));
+        onSaveHealth={(d, gejalaKeluhan) => {
+          dispatch(saveHealthReport({ itemId: actionItem.id, tanggalLaporan: d, gejalaKeluhan }));
         }} 
       />
       <ConfirmDeleteModal open={!!confirmDeleteId} cattleId={confirmDeleteId} onClose={() => setConfirmDeleteId(null)} onConfirm={(id) => dispatch(deleteCattle(id))} />

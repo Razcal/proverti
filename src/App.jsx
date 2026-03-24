@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { AuthScreen } from "./AuthScreen";
 import logoTuban from "./Tubankab.png";
 
 /*
@@ -100,8 +101,12 @@ function analyzeCattle(item) {
     const today = new Date();
     let res = { color: "slate", statusLabel: "", advice: "", isUrgent: false, adviceColor: "text-slate-600 bg-slate-50" };
 
-    const umurHari = item.birthDate ? daysDiff(item.birthDate) : 0;
-    const isJantan = item.gender === "JANTAN";
+    // Handle both old (birthDate, gender) and new (tanggal_lahir, jenis_kelamin) field names
+    const birthDate = item.tanggal_lahir || item.birthDate;
+    const gender = item.jenis_kelamin || item.gender;
+
+    const umurHari = birthDate ? daysDiff(birthDate) : 0;
+    const isJantan = gender === "JANTAN";
 
     const activeIllness = (item.healthLog || []).find(h => h.status === "SAKIT");
     if (activeIllness) {
@@ -241,6 +246,10 @@ function TimelineItem({ log, isLast }) {
 function buildHistory(item) { 
   let history = []; 
   try {
+    // Handle both old and new field names
+    const birthDate = item.tanggal_lahir || item.birthDate;
+    const origin = item.asal_usul_sapi || item.origin;
+
     (item.ibLog || []).forEach((d, i) => history.push({ type: 'ibLog', originalIndex: i, date: d, label: `IB ke-${i + 1}`, desc: "Inseminasi Buatan", colorDot: "bg-blue-500", rawDate: new Date(d) })); 
     (item.pkbLog || []).forEach((log, i) => history.push({ type: 'pkbLog', originalIndex: i, date: log.date, label: `PKB: ${log.result === "POSITIVE" ? "Positif (+)" : "Negatif (-)"}`, desc: log.result === "POSITIVE" ? "Disahkan Bunting" : "Tidak Bunting", colorDot: log.result === "POSITIVE" ? "bg-emerald-500" : "bg-rose-500", rawDate: new Date(log.date) })); 
     (item.calvingLog || []).forEach((d, i) => history.push({ type: 'calvingLog', originalIndex: i, date: d, label: "Partus", desc: "Kelahiran Pedet", colorDot: "bg-violet-500", rawDate: new Date(d) }));
@@ -248,7 +257,7 @@ function buildHistory(item) {
       const isSembuh = l.status === "SEMBUH"; let labelTxt = l.treatment?.includes("Menunggu pemeriksaan") ? `Gejala: ${l.kondisi}` : l.kondisi;
       history.push({ type: 'healthLog', originalIndex: i, date: l.date, label: isSembuh ? `✅ Sembuh: ${labelTxt}` : labelTxt, desc: l.treatment, colorDot: isSembuh ? "bg-emerald-500" : "bg-rose-500", rawDate: new Date(l.date), status: l.status || "SAKIT" });
     });
-    if (item.birthDate) history.push({ type: 'birthDate', originalIndex: 0, date: item.birthDate, label: "Lahir / Masuk", desc: item.origin === "KANDANG" ? "Lahir di kandang" : "Beli", colorDot: "bg-slate-300", rawDate: new Date(item.birthDate) }); 
+    if (birthDate) history.push({ type: 'birthDate', originalIndex: 0, date: birthDate, label: "Lahir / Masuk", desc: origin === "KANDANG" ? "Lahir di kandang" : "Beli dari pasar", colorDot: "bg-slate-300", rawDate: new Date(birthDate) }); 
     return history.sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0)); 
   } catch(e) { return []; }
 }
@@ -286,7 +295,7 @@ function DetailModal({ item, onClose, onDeleteLog }) {
         <div className="flex justify-between items-center p-6 border-b border-slate-100 pb-4">
           <div>
             <h3 className="font-black text-3xl text-slate-900 tracking-tight">{item.id}</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">{item.gender === 'JANTAN' ? 'Jantan' : 'Betina'} • {item.ras} • {item.phase}</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">{item.gender === 'JANTAN' ? 'Jantan' : 'Betina'} • {item.ras} • {item.status_reproduksi || item.phase}</p>
           </div>
           <button onClick={onClose} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200 transition-colors">✕</button>
         </div>
@@ -337,6 +346,8 @@ function AssetRecordCard({ item, onEdit, onOpenAction, onOpenDetail, onDelete, h
   const recentHistory = history.slice(0, 2);
   const cardRef = React.useRef(null);
   const isHighlighted = highlightedId === item.id;
+  const _status = String(item.status_reproduksi || item.phase || '').toUpperCase().trim();
+  const isPregnant = _status === 'PREGNANT' || _status.includes('BUNTING');
 
   useEffect(() => {
     if (isHighlighted && cardRef.current) {
@@ -351,21 +362,36 @@ function AssetRecordCard({ item, onEdit, onOpenAction, onOpenDetail, onDelete, h
   return (
     <div ref={cardRef} className={`bg-white rounded-3xl border shadow-sm overflow-hidden mb-4 hover:shadow-md transition-shadow cursor-pointer ${isHighlighted ? 'highlight-blink' : 'border-slate-100'}`} onClick={() => onOpenDetail && onOpenDetail(item)}>
       <div className="p-5 border-b border-slate-50 bg-white">
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center gap-3">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{item.id || "?"}</h3>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-bold uppercase tracking-widest">
-              {item.gender === "JANTAN" ? "♂️ JANTAN" : "♀️ BETINA"} • {item.ras || "Sapi"}
-            </span>
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-2">{item.code || item.id || "?"}</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <span className="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-bold uppercase tracking-widest">
+                {item.jenis_kelamin === "JANTAN" ? "♂️ JANTAN" : "♀️ BETINA"}
+              </span>
+              <span className="text-[10px] bg-blue-100 text-blue-600 px-2.5 py-1 rounded-lg font-bold uppercase tracking-widest">
+                {item.jenis_ras || "N/A"}
+              </span>
+              <span className="text-[10px] bg-amber-100 text-amber-600 px-2.5 py-1 rounded-lg font-bold uppercase tracking-widest">
+                {item.asal_usul_sapi === "KANDANG" ? "🏠 Kandang" : "🛒 Pasar"}
+              </span>
+            </div>
           </div>
-          <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded-xl ${c.bg} ${c.text} uppercase tracking-widest text-center leading-tight`}>{analysis.statusLabel}</span>
+          <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded-xl ${c.bg} ${c.text} uppercase tracking-widest text-center leading-tight whitespace-nowrap ml-2`}>{analysis.statusLabel}</span>
         </div>
-        <p className="text-xs text-slate-500 font-medium">Usia: <span className="font-bold text-slate-800">{getAge(item.birthDate)}</span></p>
-      </div>
-      <div className={`px-5 py-3.5 text-[11px] leading-relaxed border-b border-slate-50 ${analysis.adviceColor}`}>
-        <div className="flex gap-2.5 items-start">
-           <span className="text-base mt-0.5">{analysis.isUrgent ? '⚠️' : '💡'}</span>
-           <span className="font-medium">{analysis.advice}</span>
+        <div className="space-y-1.5 text-xs text-slate-600">
+          <p><span className="font-semibold text-slate-800">Tanggal Lahir:</span> {item.tanggal_lahir ? new Date(item.tanggal_lahir).toLocaleDateString('id-ID') : 'Tidak ada'}</p>
+          <p><span className="font-semibold text-slate-800">Usia:</span> {getAge(item.tanggal_lahir || item.birthDate)}</p>
+          {item.status_reproduksi && item.status_reproduksi !== "N/A" && (
+            <p><span className="font-semibold text-slate-800">Status Reproduksi:</span> {item.status_reproduksi}</p>
+          )}
+          {isPregnant && (
+            <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-[11px] text-orange-800 font-semibold leading-relaxed">
+                <strong>⚠️ Sapi bunting pasar.</strong> Wajib lapor hasil PKB Dokter.
+              </p>
+            </div>
+          )}
         </div>
       </div>
       <div className="p-5 pb-3">
@@ -395,15 +421,12 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
   const [pregMonth, setPregMonth] = useState("");
   const [dHealth, setDHealth] = useState(todayStr());
   const [kondisi, setKondisi] = useState("");
-  const [diagnosa, setDiagnosa] = useState("");
-  const [tindakan, setTindakan] = useState("");
-  const [statusHealth, setStatusHealth] = useState("SAKIT");
 
   useEffect(() => {
     if(open) { 
       setTab(item?.gender === "JANTAN" ? "KESEHATAN" : "REPRO");
       setResRepro("NONE"); setDRepro(todayStr()); setIsUSG(false); setPregMonth("");
-      setDHealth(todayStr()); setKondisi(""); setDiagnosa(""); setTindakan(""); setStatusHealth("SAKIT");
+      setDHealth(todayStr()); setKondisi("");
     }
   }, [open, item]);
 
@@ -430,8 +453,8 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
   };
 
   const handleSaveHealth = () => {
-    if (!kondisi) return alert("Sebutkan keluhan visual!");
-    if (onSaveHealth) onSaveHealth(dHealth, kondisi, diagnosa, tindakan, statusHealth);
+    if (!kondisi.trim()) return alert("Harap tuliskan gejala/keluhan yang dialami ternak!", "Perhatian");
+    if (onSaveHealth) onSaveHealth(dHealth, kondisi);
     if (onClose) onClose();
   };
 
@@ -450,15 +473,19 @@ function ActionModal({ open, item, onClose, onSaveRepro, onSaveHealth }) {
         </div>
         {tab === "KESEHATAN" && (
           <div className="space-y-4 fade-in">
-            <FF label="Tanggal Periksa / Lapor"><input type="date" className={inp} value={dHealth} onChange={e => setDHealth(e.target.value)} /></FF>
-            <FF label="Gejala Keluhan / Observasi (Wajib)"><textarea className={inp + " h-20 resize-none"} value={kondisi} onChange={e => setKondisi(e.target.value)} placeholder="Contoh: Kaki pincang, nafsu makan turun..." /></FF>
-            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-               <p className="text-[10px] font-extrabold text-blue-600 mb-3 uppercase tracking-widest">Aksi Dokter / Petugas Medis</p>
-               <FF label="Diagnosa Penyakit (Opsional)"><input className={inp} value={diagnosa} onChange={e => setDiagnosa(e.target.value)} placeholder="Contoh: PMK / BEF / Scours" /></FF>
-               <FF label="Tindakan & Obat (Opsional)"><input className={inp} value={tindakan} onChange={e => setTindakan(e.target.value)} placeholder="Contoh: Injeksi Vitamin & Antibiotik" /></FF>
-               <FF label="Status Akhir Pasien"><select className={inp} value={statusHealth} onChange={e => setStatusHealth(e.target.value)}><option value="SAKIT">Masih Sakit (Butuh Pantauan)</option><option value="SEMBUH">Sembuh Total</option></select></FF>
+            <FF label="Tanggal Laporan Kesehatan"><input type="date" className={inp} value={dHealth} onChange={e => setDHealth(e.target.value)} /></FF>
+            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
+              <p className="text-[10px] font-extrabold text-blue-800 uppercase tracking-widest border-b border-blue-200 pb-2 mb-2">📋 Gejala & Keluhan Ternak</p>
+              <FF label="Deskripsi Gejala / Keluhan">
+                <textarea 
+                  className={inp + " h-24 resize-none"} 
+                  value={kondisi} 
+                  onChange={e => setKondisi(e.target.value)} 
+                  placeholder="Tuliskan semua gejala dan keluhan yang dialami ternak secara detail. Contoh: Anggota gerak bengkak, demam tinggi, penurunan nafsu makan, dll..." 
+                />
+              </FF>
             </div>
-            <button onClick={handleSaveHealth} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl mt-4 text-sm shadow-lg shadow-blue-500/30">Simpan Rekam Medis</button>
+            <button onClick={handleSaveHealth} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl mt-4 text-sm shadow-lg shadow-blue-500/30 transition-all">Kirim Laporan Kesehatan</button>
           </div>
         )}
         {tab === "REPRO" && item.gender === "BETINA" && (
@@ -634,12 +661,32 @@ function DashboardView({ dbCattle, onAdviceClick }) {
   const total = safeDb.length;
   const jantan = safeDb.filter(i => i && i.gender === "JANTAN").length;
   const betina = safeDb.filter(i => i && i.gender === "BETINA").length;
-  const pregnant = safeDb.filter(i => i && i.phase === "PREGNANT").length;
+  const pregnant = safeDb.filter(i => i && i.status_reproduksi === "PREGNANT").length;
+  
+  // Filter sapi PREGNANT untuk alert section
+  const pregnantCattle = safeDb.filter(i => i && i.status_reproduksi === 'PREGNANT');
+  
   const itemsWithAdvice = safeDb.map(item => {
     if (!item) return null;
     try {
       const analysis = analyzeCattle(item);
-      // Tampilkan semua sapi yang memiliki advice, bukan hanya yang urgent
+      
+      // Include sapi PREGNANT sebagai card terpisah di Saran & Peringatan
+      const isPregnant = item.status_reproduksi === 'PREGNANT' || item.phase === 'PREGNANT';
+      
+      // Tampilkan semua sapi yang memiliki advice, atau sapi yang PREGNANT
+      if (isPregnant) {
+        return { 
+          item, 
+          analysis: { 
+            color: "orange", 
+            statusLabel: "BUNTING PASAR", 
+            advice: "⚠️ Wajib lapor hasil PKB Dokter", 
+            isUrgent: true,
+            isPregnantAlert: true
+          } 
+        };
+      }
       return analysis.advice ? { item, analysis } : null;
     } catch (e) {
       return { item, analysis: { color: "rose", statusLabel: "DATA ERROR", advice: "Format data tidak valid.", isUrgent: true } };
@@ -659,7 +706,7 @@ function DashboardView({ dbCattle, onAdviceClick }) {
            <div className="mt-8 flex gap-6 border-t border-white/10 pt-5">
               <div className="flex-1">
                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Indukan Produktif</p>
-                 <p className="font-black text-emerald-400 text-lg">{betina} <span className="text-xs font-medium text-slate-500">({pregnant} Bunting)</span></p>
+                 <p className="font-black text-emerald-400 text-lg">{pregnant} <span className="text-xs font-medium text-slate-500">(Bunting)</span></p>
               </div>
               <div className="w-px bg-white/10"></div>
               <div className="flex-1">
@@ -709,7 +756,7 @@ function AddModal({ open, onClose, onSave, editItem }) {
     }
   }, [ageInMonths, origin, gender, phase]);
 
-  const save = () => { 
+  const save = async () => { 
     if (!id.trim()) return alert("Isi Kode/Tag Sapi!"); 
 
     let calculatedBirthDate;
@@ -723,9 +770,58 @@ function AddModal({ open, onClose, onSave, editItem }) {
       calculatedBirthDate = birthDate;
     }
 
-    let base = { ibLog: editItem?.ibLog || [], healthLog: editItem?.healthLog || [], calvingLog: editItem?.calvingLog || [], pkbLog: editItem?.pkbLog || [], conceptionDate: editItem?.conceptionDate || "", calvingDate: editItem?.calvingDate || "" }; 
-    let data = { ...base, id, origin, ras, gender, phase: gender === "JANTAN" ? "N/A" : phase, birthDate: calculatedBirthDate }; 
-    if (onSave) onSave(data); if (onClose) onClose(); 
+    // Import cattleService
+    const { cattleService } = await import('./core/cattleService');
+    
+    // Get current profile and farm from localStorage
+    const profileStr = localStorage.getItem('srtt_user_profile');
+    const profile = profileStr ? JSON.parse(profileStr) : null;
+    
+    if (!profile || !profile.id) {
+      return alert("User profile tidak ditemukan!");
+    }
+
+    // Get farm from localStorage or fetch
+    let farmId = localStorage.getItem('srtt_farm_id');
+    
+    if (!farmId) {
+      // Fetch farm by user_id
+      const { profileService } = await import('./core/profileService');
+      const farmResult = await profileService.getFarm(profile.id);
+      if (!farmResult.success || !farmResult.farm) {
+        return alert("Farm tidak ditemukan! Silakan setup farm di profile terlebih dahulu.");
+      }
+      farmId = farmResult.farm.id;
+      localStorage.setItem('srtt_farm_id', farmId);
+    }
+
+    const cattleData = {
+      code: id.trim().toUpperCase(),
+      jenis_kelamin: gender,
+      jenis_ras: ras,
+      asal_usul_sapi: origin,
+      tanggal_lahir: calculatedBirthDate,
+      status_reproduksi: gender === "JANTAN" ? "N/A" : phase,
+    };
+
+    if (editItem) {
+      // Update existing cattle
+      const result = await cattleService.updateCattle(editItem.id, cattleData);
+      if (!result.success) {
+        return alert("Gagal update sapi: " + result.error);
+      }
+      alert("Data sapi berhasil diupdate!");
+    } else {
+      // Create new cattle
+      const result = await cattleService.createCattle(farmId, profile.id, cattleData);
+      if (!result.success) {
+        return alert("Gagal tambah sapi: " + result.error);
+      }
+      alert("Sapi baru berhasil ditambahkan!");
+    }
+
+    if (onSave) onSave(); 
+    if (onClose) onClose(); 
   };
   
   if (!open) return null; const inp = "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 bg-slate-50 focus:bg-white transition-all";
@@ -747,7 +843,12 @@ function AddModal({ open, onClose, onSave, editItem }) {
 
           {gender === "BETINA" && (
             <FF label="Status Reproduksi Awal">
-              <select className={inp} value={phase} onChange={e => setPhase(e.target.value)} disabled={origin === 'PASAR' && Number(ageInMonths) > 0 && Number(ageInMonths) < 18}>
+              <select className={inp} value={phase} onChange={e => { 
+                setPhase(e.target.value);
+                if (e.target.value === 'OPEN' || e.target.value === 'PREGNANT') {
+                  alert('⚠️ Sangat disarankan untuk dilakukan pemeriksaan oleh petugas/dokter hewan untuk memastikan status reproduksi dan kesehatan rahim secara akurat.');
+                }
+              }} disabled={origin === 'PASAR' && Number(ageInMonths) > 0 && Number(ageInMonths) < 18}>
                 <option value="CALF">Pedet / Dara Belum Kawin</option>
                 {(origin === 'KANDANG' || !ageInMonths || Number(ageInMonths) >= 18) && (
                   <>
@@ -808,51 +909,124 @@ function ConfirmDeleteModal({ open, onClose, onConfirm, cattleId }) {
 }
 
 function EditProfileModal({ open, onClose, onSave, currentProfile }) {
-  const [profileData, setProfileData] = useState(currentProfile);
+  const [name, setName] = useState(currentProfile?.name || '');
+  const [farmName, setFarmName] = useState(currentProfile?.farm_name || '');
+  const [address, setAddress] = useState(currentProfile?.farm_address || '');
+  const [photo, setPhoto] = useState(currentProfile?.photo || '');
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef(null);
 
   useEffect(() => {
-    if (open) {
-      setProfileData(currentProfile);
+    if (open && currentProfile) {
+      setName(currentProfile.name || '');
+      setFarmName(currentProfile.farm_name || '');
+      setAddress(currentProfile.farm_address || '');
+      setPhoto(currentProfile.photo || '');
     }
   }, [open, currentProfile]);
 
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        setProfileData({ ...profileData, photo: loadEvent.target.result });
-      };
-      reader.readAsDataURL(file);
-    } else if (file) {
-      alert("Harap pilih file gambar (JPG, PNG, dll).");
-    }
-  };
+    if (!file) return;
 
-  const handleSave = () => {
-    if (!profileData.name || !profileData.farm) {
-      alert("Nama Pemilik dan Nama Peternakan wajib diisi!");
+    if (!file.type.startsWith('image/')) {
+      alert('Harap pilih file gambar (JPG, PNG, dll).');
       return;
     }
-    onSave(profileData);
+
+    setIsLoading(true);
+    
+    // Import profileService
+    const { profileService } = await import('./core/profileService');
+    const result = await profileService.uploadProfilePhoto(currentProfile.id, file);
+    
+    if (result.success) {
+      setPhoto(result.url);
+      alert('Foto berhasil diupload!');
+    } else {
+      alert('Gagal upload foto: ' + result.error);
+    }
+    setIsLoading(false);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert('Nama Pemilik wajib diisi!');
+      return;
+    }
+    if (!farmName.trim()) {
+      alert('Nama Peternakan wajib diisi!');
+      return;
+    }
+    if (!address.trim()) {
+      alert('Lokasi / Alamat wajib diisi!');
+      return;
+    }
+
+    setIsLoading(true);
+    const { profileService } = await import('./core/profileService');
+
+    // Update user profile (name & photo)
+    const updateResult = await profileService.updateUserProfile(currentProfile.id, {
+      name: name.trim(),
+      photo: photo || null
+    });
+
+    if (!updateResult.success) {
+      alert('Gagal update profil: ' + updateResult.error);
+      setIsLoading(false);
+      return;
+    }
+
+    // Get or create farm
+    const farmResult = await profileService.getFarm(currentProfile.id);
+    let farm = farmResult.farm;
+
+    if (farm) {
+      // Update existing farm
+      const updateFarmResult = await profileService.updateFarm(farm.id, farmName, address);
+      if (!updateFarmResult.success) {
+        alert('Gagal update peternakan: ' + updateFarmResult.error);
+        setIsLoading(false);
+        return;
+      }
+      farm = updateFarmResult.farm;
+    } else {
+      // Create new farm
+      const createFarmResult = await profileService.createFarm(currentProfile.id, farmName, address);
+      if (!createFarmResult.success) {
+        alert('Gagal buat peternakan: ' + createFarmResult.error);
+        setIsLoading(false);
+        return;
+      }
+      farm = createFarmResult.farm;
+    }
+
+    // Return updated profile to parent
+    onSave({
+      ...updateResult.user,
+      farm_name: farm.name,
+      farm_address: farm.address
+    });
+
+    setIsLoading(false);
     onClose();
   };
 
   if (!open) return null;
 
-  const inp = "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 bg-slate-50 focus:bg-white transition-all";
+  const inp = "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 bg-slate-50 focus:bg-white transition-all disabled:opacity-50";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4">
-      <div className="bg-white w-full max-w-sm rounded-[24px] p-6 pop-in shadow-2xl">
+      <div className="bg-white w-full max-w-sm rounded-[24px] p-6 pop-in shadow-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="font-black text-xl text-slate-900 mb-5 tracking-tight">Edit Profil</h3>
         <div className="flex flex-col items-center mb-6">
           <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-4xl font-black text-slate-400 mb-3 shadow-inner overflow-hidden border-4 border-white">
-            {profileData.photo ? (
-              <img src={profileData.photo} alt="Profil" className="w-full h-full object-cover" />
+            {photo ? (
+              <img src={photo} alt="Profil" className="w-full h-full object-cover" />
             ) : (
-              <span>{profileData.name ? profileData.name.charAt(0).toUpperCase() : "U"}</span>
+              <span>{name ? name.charAt(0).toUpperCase() : "U"}</span>
             )}
           </div>
           <input
@@ -861,19 +1035,57 @@ function EditProfileModal({ open, onClose, onSave, currentProfile }) {
             onChange={handlePhotoChange}
             className="hidden"
             accept="image/*"
+            disabled={isLoading}
           />
-          <button onClick={() => fileInputRef.current.click()} className="px-4 py-1.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-full hover:bg-slate-200 transition-colors">
-            Ganti Foto
+          <button 
+            onClick={() => fileInputRef.current?.click()} 
+            className="px-4 py-1.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-full hover:bg-slate-200 transition-colors disabled:opacity-50"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Uploading...' : 'Ganti Foto'}
           </button>
         </div>
         <div className="space-y-4">
-          <FF label="Nama Pemilik (Owner)"><input className={inp} value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} /></FF>
-          <FF label="Nama Peternakan"><input className={inp} value={profileData.farm} onChange={e => setProfileData({...profileData, farm: e.target.value})} /></FF>
-          <FF label="Lokasi / Alamat"><input className={inp} value={profileData.address} onChange={e => setProfileData({...profileData, address: e.target.value})} /></FF>
+          <FF label="Nama Pemilik (Owner)">
+            <input 
+              className={inp} 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              disabled={isLoading}
+            />
+          </FF>
+          <FF label="Nama Peternakan">
+            <input 
+              className={inp} 
+              value={farmName} 
+              onChange={e => setFarmName(e.target.value)}
+              disabled={isLoading}
+            />
+          </FF>
+          <FF label="Lokasi / Alamat">
+            <input 
+              className={inp} 
+              value={address} 
+              onChange={e => setAddress(e.target.value)}
+              disabled={isLoading}
+            />
+          </FF>
         </div>
         <div className="flex gap-3 mt-8">
-          <button onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Batal</button>
-          <button onClick={handleSave} className="flex-1 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-500/30 transition-all">Simpan Perubahan</button>
+          <button 
+            onClick={onClose} 
+            className="flex-1 py-3.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            disabled={isLoading}
+          >
+            Batal
+          </button>
+          <button 
+            onClick={handleSave} 
+            className="flex-1 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-500/30 transition-all disabled:opacity-50"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+          </button>
         </div>
       </div>
     </div>
@@ -881,6 +1093,42 @@ function EditProfileModal({ open, onClose, onSave, currentProfile }) {
 }
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', fontSize: '18px', color: 'red', fontFamily: 'monospace' }}>
+          <h1>❌ Error in App:</h1>
+          <pre>{this.state.error?.toString()}</pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AppContent() {
   const [dbCattle, setDbCattle] = useState(() => {
     try { const data = JSON.parse(localStorage.getItem("srtt_db_cattle")); return Array.isArray(data) ? data : []; } 
     catch (e) { return []; }
@@ -890,6 +1138,9 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("srtt_user_profile")) || null; } 
     catch (e) { return null; }
   });
+  
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false); // Track if user clicked "Mulai Sistem Pendataan"
   
   const [nav, setNav] = useState("dashboard"); 
   const [addOpen, setAddOpen] = useState(false); 
@@ -902,17 +1153,84 @@ export default function App() {
   const [genderFilter, setGenderFilter] = useState("ALL");
   const [highlightedId, setHighlightedId] = useState(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  
+  // DEBUG - Moved after all state declarations
+  useEffect(() => {
+    console.log("=== APP STATE ===");
+    console.log("hideSplashDOM:", hideSplashDOM);
+    console.log("hasStarted:", hasStarted);
+    console.log("showAuthScreen:", showAuthScreen);
+    console.log("profile:", profile);
+    console.log("Will render:");
+    if (!hideSplashDOM) console.log("  - SPLASH SCREEN");
+    if (hideSplashDOM && !hasStarted) console.log("  - WELCOME SCREEN");
+    if (hideSplashDOM && hasStarted && !profile) console.log("  - AUTH SCREEN");
+    if (hideSplashDOM && hasStarted && profile) console.log("  - DASHBOARD");
+  }, [hideSplashDOM, hasStarted, showAuthScreen, profile]);
 
   useEffect(() => { setTimeout(() => setHideSplashDOM(true), 2500); }, []);
   useEffect(() => { try { localStorage.setItem("srtt_db_cattle", JSON.stringify(dbCattle)); } catch(e) {} }, [dbCattle]); 
   useEffect(() => { try { if (profile) localStorage.setItem("srtt_user_profile", JSON.stringify(profile)); } catch(e) {} }, [profile]);
+
+  // Load cattle from database when profile is available
+  useEffect(() => {
+    const loadCattleData = async () => {
+      if (!profile || !profile.id) return;
+
+      try {
+        // Get farm
+        let farmId = localStorage.getItem('srtt_farm_id');
+        
+        if (!farmId) {
+          const { profileService } = await import('./core/profileService');
+          const farmResult = await profileService.getFarm(profile.id);
+          if (farmResult.success && farmResult.farm) {
+            farmId = farmResult.farm.id;
+            localStorage.setItem('srtt_farm_id', farmId);
+          } else {
+            return; // No farm found
+          }
+        }
+
+        // Load cattle
+        const { cattleService } = await import('./core/cattleService');
+        const result = await cattleService.getCattleByFarm(farmId);
+        if (result.success) {
+          setDbCattle(result.cattle);
+        }
+      } catch (error) {
+        console.error('Failed to load cattle data:', error);
+      }
+    };
+
+    loadCattleData();
+  }, [profile?.id]); // Only run when profile changes
   
-  const handleSaveAdd = (data) => {
-    const exists = dbCattle.some(c => c.id === data.id);
-    if (editItem || exists) {
-      setDbCattle(p => p.map(x => x.id === (editItem?.id || data.id) ? { ...x, ...data } : x));
-    } else {
-      setDbCattle(p => [...p, data]);
+  const handleSaveAdd = async () => {
+    // Reload cattle data from database after save
+    const profileStr = localStorage.getItem('srtt_user_profile');
+    const profile = profileStr ? JSON.parse(profileStr) : null;
+    
+    if (!profile) return;
+
+    // Get farm from localStorage or fetch
+    let farmId = localStorage.getItem('srtt_farm_id');
+    
+    if (!farmId) {
+      const { profileService } = await import('./core/profileService');
+      const farmResult = await profileService.getFarm(profile.id);
+      if (farmResult.success && farmResult.farm) {
+        farmId = farmResult.farm.id;
+        localStorage.setItem('srtt_farm_id', farmId);
+      }
+    }
+
+    if (farmId) {
+      const { cattleService } = await import('./core/cattleService');
+      const result = await cattleService.getCattleByFarm(farmId);
+      if (result.success) {
+        setDbCattle(result.cattle);
+      }
     }
   };
 
@@ -935,8 +1253,16 @@ export default function App() {
     setConfirmDeleteId(id);
   };
 
-  const executeDelete = (id) => {
-    setDbCattle(p => p.filter(x => x.id !== id));
+  const executeDelete = async (id) => {
+    const { cattleService } = await import('./core/cattleService');
+    const result = await cattleService.deleteCattle(id);
+    if (result.success) {
+      setDbCattle(p => p.filter(x => x.id !== id));
+      setDetailItem(null);
+      alert("Sapi berhasil dihapus!");
+    } else {
+      alert("Gagal menghapus sapi: " + result.error);
+    }
   };
 
   const handleAdviceClick = (item) => {
@@ -961,13 +1287,49 @@ export default function App() {
     const up = [...dbCattle]; up[idx] = current; setDbCattle(up); 
   };
 
-  const handleSaveHealth = (d, kondisi, diagnosa, tindakan, status) => {
+  const handleSaveHealth = (d, kondisi) => {
+    console.log("=== handleSaveHealth called ===");
+    console.log("actionItem:", actionItem);
+    console.log("actionItem?.id:", actionItem?.id);
+    console.log("d:", d, "typeof:", typeof d);
+    console.log("kondisi:", kondisi, "typeof:", typeof kondisi);
+    console.log("dbCattle length:", dbCattle.length);
+    console.log("dbCattle IDs:", dbCattle.map(b => b.id));
+    
+    if (!actionItem) {
+      console.error("❌ ERROR: actionItem is null!");
+      alert("Error: actionItem tidak ditemukan!");
+      return;
+    }
+    
     const idx = dbCattle.findIndex(b => b.id === actionItem.id); 
-    if (idx === -1) return;
+    console.log("✓ Found index:", idx);
+    
+    if (idx === -1) {
+      console.error("❌ ERROR: Cattle not found in dbCattle!");
+      console.log("Looking for ID:", actionItem.id);
+      alert("Error: Sapi tidak ditemukan di database!");
+      return;
+    }
+    
     let current = { ...dbCattle[idx] }; 
-    let treatmentText = diagnosa ? `(Diagnosa: ${diagnosa}) - ${tindakan || 'Perlu pantauan'}` : (tindakan || "Menunggu pemeriksaan & tindakan medis");
-    current.healthLog = [...(current.healthLog || []), { date: d, kondisi: kondisi, treatment: treatmentText, status: status }];
-    const up = [...dbCattle]; up[idx] = current; setDbCattle(up);
+    console.log("✓ Current cattle before update:", current);
+    
+    current.healthReports = current.healthReports || [];
+    console.log("✓ Health reports array:", current.healthReports);
+    
+    current.healthReports.push({
+      tanggalLaporan: d,
+      gejalaKeluhan: kondisi,
+      createdAt: new Date().toISOString()
+    });
+    console.log("✓ Updated cattle:", current);
+    
+    const up = [...dbCattle]; 
+    up[idx] = current; 
+    console.log("✓ About to call setDbCattle with:", up);
+    setDbCattle(up);
+    console.log("✅ Data saved to state - setDbCattle called");
   };
 
   const safeDb = Array.isArray(dbCattle) ? dbCattle : [];
@@ -992,19 +1354,28 @@ export default function App() {
         </div>
       )}
 
-      {hideSplashDOM && !profile && (
+      {hideSplashDOM && !hasStarted && (
+        // WELCOME SCREEN - User hasn't clicked "Mulai" yet
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-50 px-4 slide-up">
            <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-slate-100 text-center">
              <div className="flex justify-center mb-5"><img src={logoTuban} alt="Logo Tuban" className="w-20 h-auto object-contain drop-shadow-sm" /></div>
              <p className="text-[8.5px] font-black text-emerald-600 uppercase tracking-widest mb-6 leading-snug">Dinas Ketahanan Pangan, Pertanian, dan Perikanan<br/>Kabupaten Tuban</p>
              <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">PROVERTI</h1>
              <p className="text-[10px] font-bold text-slate-500 mb-8 leading-relaxed whitespace-nowrap overflow-x-auto">(Portofolio Recording Observasi Veteriner, Reproduksi, dan Ternak Integrasi)</p>
-             <button onClick={() => setProfile({ name: "Petugas / Medik Vet", farm: "Tuban" })} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl text-sm shadow-lg shadow-emerald-500/30 transition-all">Mulai Sistem Pendataan</button>
+             <button onClick={() => { setHasStarted(true); setShowAuthScreen(true); }} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl text-sm shadow-lg shadow-emerald-500/30 transition-all">Mulai Sistem Pendataan</button>
            </div>
         </div>
       )}
 
-      {hideSplashDOM && profile && (
+      {hideSplashDOM && hasStarted && !profile && (
+        // AUTH SCREEN - User clicked "Mulai" but not logged in yet
+        <AuthScreen setProfile={(userData) => {
+          setProfile(userData);
+          setShowAuthScreen(false);
+        }} />
+      )}
+
+      {hideSplashDOM && hasStarted && profile && (
         <>
           {/* HEADER PEMERINTAHAN GLOBAL */}
           <div className="bg-white px-2 sm:px-5 pt-3 pb-3 sm:pt-4 sm:pb-4 border-b border-slate-200 shadow-sm mb-3 z-40 relative">
@@ -1076,7 +1447,7 @@ export default function App() {
                     )}
                   </div>
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight">{profile.name}</h2>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{profile.farm} Area</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{profile.farm || profile.desa || "Tuban"} Area</p>
                   <button onClick={() => setEditProfileOpen(true)} className="mt-4 px-6 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-full hover:bg-slate-200 transition-colors">Edit Profil</button>
                 </div>
 

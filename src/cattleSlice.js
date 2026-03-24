@@ -54,9 +54,22 @@ const cattleSlice = createSlice({
         current.healthLog.push(logEntry);
         localStorage.setItem("srtt_db_cattle", JSON.stringify(state.list));
       }
+    },
+    saveHealthReport: (state, action) => {
+      const { itemId, tanggalLaporan, gejalaKeluhan } = action.payload;
+      const current = state.list.find(b => b.id === itemId);
+      if (current) {
+        current.healthReports = current.healthReports || [];
+        current.healthReports.push({
+          tanggalLaporan,
+          gejalaKeluhan,
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem("srtt_db_cattle", JSON.stringify(state.list));
+      }
     }
   }
 });
 
-export const { addOrUpdateCattle, deleteCattle, deleteCattleLog, saveReproLog, saveHealthLog } = cattleSlice.actions;
+export const { addOrUpdateCattle, deleteCattle, deleteCattleLog, saveReproLog, saveHealthLog, saveHealthReport } = cattleSlice.actions;
 export default cattleSlice.reducer;
